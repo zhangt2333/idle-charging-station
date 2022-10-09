@@ -1,0 +1,5 @@
+# keep this the first line in the file
+*	text=auto
+*.txt	text eol=lf
+*.log	text eol=lf
+*.py	text eol=lf
