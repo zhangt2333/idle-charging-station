@@ -26,6 +26,8 @@ jobs:
         uses: nick-fields/retry@v2
         env:
           JSESSIONID: ${{ secrets.JSESSIONID }}
+          HTTP_PROXY: ${{ secrets.PROXY }}
+          HTTPS_PROXY: ${{ secrets.PROXY }}
         with:
           timeout_minutes: 3
           max_attempts: 3

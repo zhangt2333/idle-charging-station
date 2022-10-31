@@ -111,5 +111,6 @@ table, th, td {
 <h3>更新时间：{getGMT8()}</h3>
 {tabulate(tableBody, tableHeader, tablefmt="html")}
 """
-
+if not os.path.exists("public"):
+    os.mkdir("public")
 open("public/index.html", mode="w", encoding="utf-8").write(html)
