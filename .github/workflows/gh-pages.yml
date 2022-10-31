@@ -1,0 +1,40 @@
+name: gh-pages
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: # add manually button
+
+jobs:
+  gh-pages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.6"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      
+      - name: Run Spider
+        uses: nick-fields/retry@v2
+        env:
+          JSESSIONID: ${{ secrets.JSESSIONID }}
+        with:
+          timeout_minutes: 3
+          max_attempts: 3
+          command: python spider.py
+
+      - name: Github Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
+          user_name: "github-actions[bot]"
+          user_email: "github-actions[bot]@users.noreply.github.com"

@@ -112,4 +112,4 @@ table, th, td {
 {tabulate(tableBody, tableHeader, tablefmt="html")}
 """
 
-open("index.html", mode="w", encoding="utf-8").write(html)
+open("public/index.html", mode="w", encoding="utf-8").write(html)
