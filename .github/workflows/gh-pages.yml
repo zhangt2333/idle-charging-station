@@ -1,9 +1,9 @@
 name: gh-pages
 
 on:
-  schedule:
-    - cron: "*/5 * * * *"
   workflow_dispatch: # add manually button
+  repository_dispatch:
+    types: [gh-pages]
 
 permissions:
   contents: read
