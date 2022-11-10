@@ -35,15 +35,12 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
       
       - name: Run Spider
-        uses: nick-fields/retry@v2
         env:
           JSESSIONID: ${{ secrets.JSESSIONID }}
           HTTP_PROXY: ${{ secrets.PROXY }}
           HTTPS_PROXY: ${{ secrets.PROXY }}
-        with:
-          timeout_minutes: 3
-          max_attempts: 3
-          command: python spider.py
+        run: |
+          python spider.py || true
 
       - name: Setup Pages
         uses: actions/configure-pages@v2
