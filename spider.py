@@ -47,10 +47,10 @@ stations = [
     {"iStationId": 117381, "vStationName": "游泳馆1号机"},
     # {"iStationId": 117369, "vStationName": "5栋2号机"},
     # {"iStationId": 117375, "vStationName": "5栋1号机"},
-    # {"iStationId": 117387, "vStationName": "24栋1号机"},
-    # {"iStationId": 117474, "vStationName": "24栋2号机"},
-    # {"iStationId": 117372, "vStationName": "17栋2号机"},
-    # {"iStationId": 117374, "vStationName": "17栋1号机"}
+    {"iStationId": 117387, "vStationName": "24栋1号机"},
+    {"iStationId": 117474, "vStationName": "24栋2号机"},
+    {"iStationId": 117372, "vStationName": "17栋2号机"},
+    {"iStationId": 117374, "vStationName": "17栋1号机"},
 ]
 
 results = []
