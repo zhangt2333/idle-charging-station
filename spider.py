@@ -124,4 +124,4 @@ for area in areas:
 
 if not os.path.exists("build"):
     os.mkdir("build")
-open("public/index.html", mode="w", encoding="utf-8").write(html)
+open("build/index.html", mode="w", encoding="utf-8").write(html)
