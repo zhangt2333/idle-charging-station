@@ -18,23 +18,23 @@ class ChargingStation:
                  area: str,
                  isUsing: bool,
                  power: int,
-                 usedTime: int,
-                 totalTime: int):
+                 usedMinutes: int,
+                 totalMinutes: int):
         self.stationName = stationName
         self.outletName = outletName
         self.area = area
         self.isUsing = isUsing
         self.power = power
-        self.usedTime = usedTime
-        self.totalTime = totalTime
-        self.remainingTime = totalTime - usedTime
-        self.usedAndTotalTimeDesc = ""
+        self.usedMinutes = usedMinutes
+        self.totalMinutes = totalMinutes
+        self.remainingMinutes = totalMinutes - usedMinutes
+        self.usedAndTotalMinutesDesc = ""
         self.remainingTimeDesc = ""
         self.endTimeDesc = ""
         if isUsing:
-            self.usedAndTotalTimeDesc = f"{usedTime}/{totalTime}分钟"
-            self.remainingTimeDesc = f"{self.remainingTime // 60}小时{self.remainingTime % 60}分钟"
-            self.endTimeDesc = getGMT8("%Y-%m-%d %H:%M", self.remainingTime)
+            self.usedAndTotalMinutesDesc = f"{usedMinutes}/{totalMinutes}分钟"
+            self.remainingTimeDesc = f"{self.remainingMinutes // 60}小时{self.remainingMinutes % 60}分钟"
+            self.endTimeDesc = getGMT8("%Y-%m-%d %H:%M", self.remainingMinutes)
 
 
 def extractDigit(s: str) -> int:
@@ -90,18 +90,18 @@ for station in [
         resp = session.get(f"https://api.issks.com/issksapi/V2/ec/charging/{outlet['vOutletNo']}.shtml")
         assert resp.status_code == 200
 
-        isUsing, power, usedTime, totalTime = False, 0, 0, 0
+        isUsing, power, usedMinutes, totalMinutes = False, 0, 0, 0
         if (soup := BeautifulSoup(resp.text, "lxml")).select_one(".state_item"):
             isUsing = True
             power = extractDigit(soup.select_one(".state_item:nth-child(1) p").text)  # 瓦
-            usedTime = extractDigit(soup.select_one(".state_item:nth-child(2) p").text)  # 分钟
-            totalTime = extractDigit(soup.select(".state_item:nth-child(1) span")[-1].text) * 60  # 分钟
-            totalTime = totalTime if totalTime != 0 else 999
+            usedMinutes = extractDigit(soup.select_one(".state_item:nth-child(2) p").text)  # 分钟
+            totalMinutes = extractDigit(soup.select(".state_item:nth-child(1) span")[-1].text) * 60  # 分钟
+            totalMinutes = totalMinutes if totalMinutes != 0 else 999
 
         results.append(ChargingStation(station["vStationName"], outlet["vOutletName"], station["area"],
-                                       isUsing, power, usedTime, totalTime))
+                                       isUsing, power, usedMinutes, totalMinutes))
 
-results = sorted(results, key=lambda x: x.remainingTime)
+results = sorted(results, key=lambda x: x.remainingMinutes)
 
 html = """
 <style>
@@ -117,7 +117,7 @@ htmlTableHeader = ("充电桩", "插座号", "充电时长", "剩余时长", "�
 areas = ["三组团", "四组团", "二组团", "一组团"]
 for area in areas:
     html += f"<h4>{area}</h4>"
-    html += tabulate(list(map(lambda x: [x.stationName, x.outletName, x.usedAndTotalTimeDesc,
+    html += tabulate(list(map(lambda x: [x.stationName, x.outletName, x.usedAndTotalMinutesDesc,
                                          x.remainingTimeDesc, x.endTimeDesc],
                               filter(lambda x: x.area == area, results))),
                      htmlTableHeader, tablefmt="html")
