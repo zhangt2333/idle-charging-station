@@ -96,7 +96,7 @@ for station in [
             power = extractDigit(soup.select_one(".state_item:nth-child(1) p").text)  # 瓦
             usedMinutes = extractDigit(soup.select_one(".state_item:nth-child(2) p").text)  # 分钟
             totalMinutes = extractDigit(soup.select(".state_item:nth-child(1) span")[-1].text) * 60  # 分钟
-            totalMinutes = totalMinutes if totalMinutes != 0 else 999
+            totalMinutes = totalMinutes if totalMinutes != 0 else 600
 
         results.append(ChargingStation(station["vStationName"], outlet["vOutletName"], station["area"],
                                        isUsing, power, usedMinutes, totalMinutes))
