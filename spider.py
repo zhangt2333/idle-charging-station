@@ -69,18 +69,20 @@ if not checkAlive(session):
 
 results: List[ChargingStation] = []
 
-for station in [
-    {"iStationId": 117379, "vStationName": "第十餐厅1号机", "area": "三组团"},
-    {"iStationId": 117392, "vStationName": "第十餐厅2号机", "area": "三组团"},
-    {"iStationId": 117387, "vStationName": "24栋1号机", "area": "四组团"},
-    {"iStationId": 117474, "vStationName": "24栋2号机", "area": "四组团"},
-    {"iStationId": 117372, "vStationName": "17栋2号机", "area": "四组团"},
-    {"iStationId": 117374, "vStationName": "17栋1号机", "area": "四组团"},
-    {"iStationId": 117377, "vStationName": "游泳馆2号机", "area": "二组团"},
-    {"iStationId": 117381, "vStationName": "游泳馆1号机", "area": "二组团"},
+stations = [
+    {"iStationId": 117387, "vStationName": "24栋1号机", "area": "四组团-24栋"},
+    {"iStationId": 117474, "vStationName": "24栋2号机", "area": "四组团-24栋"},
+    {"iStationId": 117372, "vStationName": "17栋2号机", "area": "四组团-17栋"},
+    {"iStationId": 117374, "vStationName": "17栋1号机", "area": "四组团-17栋"},
+    # {"iStationId": 117379, "vStationName": "第十餐厅1号机", "area": "三组团"},
+    # {"iStationId": 117392, "vStationName": "第十餐厅2号机", "area": "三组团"},
+    # {"iStationId": 117377, "vStationName": "游泳馆2号机", "area": "二组团"},
+    # {"iStationId": 117381, "vStationName": "游泳馆1号机", "area": "二组团"},
     # {"iStationId": 117369, "vStationName": "5栋2号机", "area": "一组团"},
     # {"iStationId": 117375, "vStationName": "5栋1号机", "area": "一组团"},
-]:
+]
+
+for station in stations:
     stationId = station["iStationId"]
     resp = session.get("https://api.issks.com/issksapi/V2/ec/chargingList.shtml",
                        params=dict(stationId=stationId))
@@ -114,8 +116,7 @@ table, th, td {
 """
 htmlTableHeader = ("充电桩", "插座号", "充电时长", "剩余时长", "结束时间")
 
-areas = ["三组团", "四组团", "二组团", "一组团"]
-for area in areas:
+for area in set(map(lambda s: s["area"], stations)):
     html += f"<h4>{area}</h4>"
     html += tabulate(list(map(lambda x: [x.stationName, x.outletName, x.usedAndTotalMinutesDesc,
                                          x.remainingTimeDesc, x.endTimeDesc],
