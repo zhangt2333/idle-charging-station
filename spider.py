@@ -5,6 +5,7 @@ import os
 from datetime import datetime, timedelta
 from time import time
 from typing import List
+from collections import OrderedDict
 
 from tabulate import tabulate
 from bs4 import BeautifulSoup
@@ -116,7 +117,7 @@ table, th, td {
 """
 htmlTableHeader = ("充电桩", "插座号", "充电时长", "剩余时长", "结束时间")
 
-for area in set(map(lambda s: s["area"], stations)):
+for area in list(OrderedDict.fromkeys([s["area"] for s in stations])):
     html += f"<h4>{area}</h4>"
     html += tabulate(list(map(lambda x: [x.stationName, x.outletName, x.usedAndTotalMinutesDesc,
                                          x.remainingTimeDesc, x.endTimeDesc],
