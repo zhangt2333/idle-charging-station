@@ -1,41 +1,56 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# !/usr/bin/env python3
-import json
 import os
-from datetime import datetime, timedelta
-from time import time
-from typing import List
+from dataclasses import dataclass
+from enum import Enum
 from collections import OrderedDict
 
 from tabulate import tabulate
 from bs4 import BeautifulSoup
 from requests import Session
 
+MAX_MINUTES = 999
 
+
+@dataclass
 class ChargingStation:
-    def __init__(self,
-                 stationName: str,
-                 outletName: str,
-                 area: str,
-                 isUsing: bool,
-                 power: int,
-                 usedMinutes: int,
-                 totalMinutes: int):
-        self.stationName = stationName
-        self.outletName = outletName
-        self.area = area
-        self.isUsing = isUsing
-        self.power = power
-        self.usedMinutes = usedMinutes
-        self.totalMinutes = totalMinutes
-        self.remainingMinutes = totalMinutes - usedMinutes
-        self.usedAndTotalMinutesDesc = ""
-        self.remainingTimeDesc = ""
-        self.endTimeDesc = ""
-        if isUsing:
-            self.usedAndTotalMinutesDesc = f"{usedMinutes}/{totalMinutes}分钟"
-            self.remainingTimeDesc = f"{self.remainingMinutes // 60}小时{self.remainingMinutes % 60}分钟"
-            self.endTimeDesc = getGMT8("%Y-%m-%d %H:%M", self.remainingMinutes)
+    class Status(Enum):
+        USING = "使用中"
+        AVAILABLE = "空闲中"
+        UNAVAILABLE = "维护中"
+
+    stationName: str
+    outletName: str
+    area: str
+    status: Status = Status.AVAILABLE
+    power: int = 0
+    usedMinutes: int = 0
+    totalMinutes: int = 0
+
+    @property
+    def remainingMinutes(self) -> int:
+        return (self.totalMinutes - self.usedMinutes
+                if self.status == ChargingStation.Status.USING else MAX_MINUTES)
+
+    @property
+    def usedAndTotalMinutesDesc(self) -> str:
+        return (f"{self.usedMinutes}/{self.totalMinutes}分钟"
+                if self.status == ChargingStation.Status.USING else "")
+
+    @property
+    def remainingTimeDesc(self) -> str:
+        return (f"{self.remainingMinutes // 60}小时{self.remainingMinutes % 60}分钟"
+                if self.status == ChargingStation.Status.USING else "")
+
+    @property
+    def endTimeDesc(self) -> str:
+        return (getDatetime("%Y-%m-%d %H:%M", +8, self.remainingMinutes)
+                if self.status == ChargingStation.Status.USING else "")
+
+    @property
+    def note(self) -> str:
+        return (self.status.value
+                if self.status == ChargingStation.Status.UNAVAILABLE else "")
 
 
 def extractDigit(s: str) -> int:
@@ -45,8 +60,11 @@ def extractDigit(s: str) -> int:
         return 0
 
 
-def getGMT8(format="%Y-%m-%d %H:%M", deltaMinutes=0) -> str:
-    return (datetime.utcfromtimestamp((time())) + timedelta(hours=8, minutes=deltaMinutes)).strftime(format)
+def getDatetime(fmt="%Y-%m-%d %H:%M:%S", timezone=8, deltaMinutes=0):
+    import datetime, time
+    return ((datetime.datetime.utcfromtimestamp(time.time())
+             + datetime.timedelta(hours=timezone, minutes=deltaMinutes))
+            .strftime(fmt))
 
 
 def checkAlive(session: Session):
@@ -68,9 +86,12 @@ if not checkAlive(session):
     print("Cookie失效")
     exit(-1)
 
-results: List[ChargingStation] = []
+results: list[ChargingStation] = []
 
 stations = [
+    {"iStationId": 158507, "vStationName": "27栋1号机", "area": "四组团-27栋"},
+    {"iStationId": 158748, "vStationName": "27栋2号机", "area": "四组团-27栋"},
+    {"iStationId": 158501, "vStationName": "27栋3号机", "area": "四组团-27栋"},
     {"iStationId": 117387, "vStationName": "24栋1号机", "area": "四组团-24栋"},
     {"iStationId": 117474, "vStationName": "24栋2号机", "area": "四组团-24栋"},
     {"iStationId": 117372, "vStationName": "17栋2号机", "area": "四组团-17栋"},
@@ -88,21 +109,19 @@ for station in stations:
     resp = session.get("https://api.issks.com/issksapi/V2/ec/chargingList.shtml",
                        params=dict(stationId=stationId))
     assert resp.status_code == 200
-    outlets = json.loads(resp.text)["list"]
+    outlets = resp.json()["list"]
     for outlet in outlets:
         resp = session.get(f"https://api.issks.com/issksapi/V2/ec/charging/{outlet['vOutletNo']}.shtml")
         assert resp.status_code == 200
-
-        isUsing, power, usedMinutes, totalMinutes = False, 0, 0, 0
-        if (soup := BeautifulSoup(resp.text, "lxml")).select_one(".state_item"):
-            isUsing = True
-            power = extractDigit(soup.select_one(".state_item:nth-child(1) p").text)  # 瓦
-            usedMinutes = extractDigit(soup.select_one(".state_item:nth-child(2) p").text)  # 分钟
+        chargingStation = ChargingStation(station["vStationName"], outlet["vOutletName"], station["area"])
+        if "设备维护中" in resp.text:
+            chargingStation.status = ChargingStation.Status.UNAVAILABLE
+        elif (soup := BeautifulSoup(resp.text, "lxml")).select_one(".state_item"):
+            chargingStation.power = extractDigit(soup.select_one(".state_item:nth-child(1) p").text)  # 瓦
+            chargingStation.usedMinutes = extractDigit(soup.select_one(".state_item:nth-child(2) p").text)  # 分钟
             totalMinutes = extractDigit(soup.select(".state_item:nth-child(1) span")[-1].text) * 60  # 分钟
-            totalMinutes = totalMinutes if totalMinutes != 0 else 600
-
-        results.append(ChargingStation(station["vStationName"], outlet["vOutletName"], station["area"],
-                                       isUsing, power, usedMinutes, totalMinutes))
+            chargingStation.totalMinutes = totalMinutes if totalMinutes != 0 else 600
+        results.append(chargingStation)
 
 results = sorted(results, key=lambda x: x.remainingMinutes)
 
@@ -113,14 +132,14 @@ table, th, td {
 }
 </style>
 """ + f"""
-<h2>更新时间：{getGMT8()}</h2>
+<h1>更新时间：{getDatetime(fmt="%Y-%m-%d %H:%M")}</h1>
 """
-htmlTableHeader = ("充电桩", "插座号", "充电时长", "剩余时长", "结束时间")
+htmlTableHeader = ("充电桩", "插座号", "充电时长", "剩余时长", "结束时间", "备注")
 
 for area in list(OrderedDict.fromkeys([s["area"] for s in stations])):
-    html += f"<h4>{area}</h4>"
+    html += f"<h3>{area}</h3>"
     html += tabulate(list(map(lambda x: [x.stationName, x.outletName, x.usedAndTotalMinutesDesc,
-                                         x.remainingTimeDesc, x.endTimeDesc],
+                                         x.remainingTimeDesc, x.endTimeDesc, x.note],
                               filter(lambda x: x.area == area, results))),
                      htmlTableHeader, tablefmt="html")
 
