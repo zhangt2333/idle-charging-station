@@ -89,9 +89,9 @@ if not checkAlive(session):
 results: list[ChargingStation] = []
 
 stations = [
-    {"iStationId": 158507, "vStationName": "27栋1号机", "area": "四组团-27栋"},
-    {"iStationId": 158748, "vStationName": "27栋2号机", "area": "四组团-27栋"},
-    {"iStationId": 158501, "vStationName": "27栋3号机", "area": "四组团-27栋"},
+    # {"iStationId": 158507, "vStationName": "27栋1号机", "area": "四组团-27栋"},
+    # {"iStationId": 158748, "vStationName": "27栋2号机", "area": "四组团-27栋"},
+    # {"iStationId": 158501, "vStationName": "27栋3号机", "area": "四组团-27栋"},
     {"iStationId": 117387, "vStationName": "24栋1号机", "area": "四组团-24栋"},
     {"iStationId": 117474, "vStationName": "24栋2号机", "area": "四组团-24栋"},
     {"iStationId": 117372, "vStationName": "17栋2号机", "area": "四组团-17栋"},
@@ -114,7 +114,7 @@ for station in stations:
         resp = session.get(f"https://api.issks.com/issksapi/V2/ec/charging/{outlet['vOutletNo']}.shtml")
         assert resp.status_code == 200
         chargingStation = ChargingStation(station["vStationName"], outlet["vOutletName"], station["area"])
-        if "设备维护中" in resp.text:
+        if "设备维护中" in resp.text or outlet["status"] == 3:  # status=3 时页面提示该插座安全隐患不可用
             chargingStation.status = ChargingStation.Status.UNAVAILABLE
         elif (soup := BeautifulSoup(resp.text, "lxml")).select_one(".state_item"):
             chargingStation.status = ChargingStation.Status.USING
