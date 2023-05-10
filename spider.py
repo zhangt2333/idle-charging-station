@@ -30,7 +30,7 @@ class ChargingStation:
     @property
     def remainingMinutes(self) -> int:
         return (self.totalMinutes - self.usedMinutes
-                if self.status == ChargingStation.Status.USING else MAX_MINUTES)
+                if self.status != ChargingStation.Status.UNAVAILABLE else MAX_MINUTES)
 
     @property
     def usedAndTotalMinutesDesc(self) -> str:
@@ -117,6 +117,7 @@ for station in stations:
         if "设备维护中" in resp.text:
             chargingStation.status = ChargingStation.Status.UNAVAILABLE
         elif (soup := BeautifulSoup(resp.text, "lxml")).select_one(".state_item"):
+            chargingStation.status = ChargingStation.Status.USING
             chargingStation.power = extractDigit(soup.select_one(".state_item:nth-child(1) p").text)  # 瓦
             chargingStation.usedMinutes = extractDigit(soup.select_one(".state_item:nth-child(2) p").text)  # 分钟
             totalMinutes = extractDigit(soup.select(".state_item:nth-child(1) span")[-1].text) * 60  # 分钟
