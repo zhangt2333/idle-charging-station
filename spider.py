@@ -89,13 +89,24 @@ if not checkAlive(session):
 results: list[ChargingStation] = []
 
 stations = [
-    # {"iStationId": 158507, "vStationName": "27栋1号机", "area": "四组团-27栋"},
-    # {"iStationId": 158748, "vStationName": "27栋2号机", "area": "四组团-27栋"},
-    # {"iStationId": 158501, "vStationName": "27栋3号机", "area": "四组团-27栋"},
+    {"iStationId": 158789, "vStationName": "26栋1号机", "area": "四组团-26栋"},
+    {"iStationId": 158742, "vStationName": "26栋2号机", "area": "四组团-26栋"},
+    {"iStationId": 158664, "vStationName": "26栋3号机", "area": "四组团-26栋"},
+    {"iStationId": 158507, "vStationName": "27栋1号机", "area": "四组团-27栋"},
+    {"iStationId": 158748, "vStationName": "27栋2号机", "area": "四组团-27栋"},
+    {"iStationId": 158501, "vStationName": "27栋3号机", "area": "四组团-27栋"},
+    {"iStationId": 158764, "vStationName": "27栋4号机", "area": "四组团-27栋"},
+    {"iStationId": 158666, "vStationName": "27栋5号机", "area": "四组团-27栋"},
+    {"iStationId": 158661, "vStationName": "27栋6号机", "area": "四组团-27栋"},
+    {"iStationId": 158668, "vStationName": "27栋7号机", "area": "四组团-27栋"},
     {"iStationId": 117387, "vStationName": "24栋1号机", "area": "四组团-24栋"},
     {"iStationId": 117474, "vStationName": "24栋2号机", "area": "四组团-24栋"},
-    {"iStationId": 117372, "vStationName": "17栋2号机", "area": "四组团-17栋"},
-    {"iStationId": 117374, "vStationName": "17栋1号机", "area": "四组团-17栋"},
+    {"iStationId": 117374, "vStationName": "17栋（8插座）1号机", "area": "四组团-17栋"},
+    {"iStationId": 117372, "vStationName": "17栋（8插座）2号机", "area": "四组团-17栋"},
+    {"iStationId": 165088, "vStationName": "17栋（8插座）3号机", "area": "四组团-17栋"},
+    {"iStationId": 158676, "vStationName": "17栋（10插座）1号机", "area": "四组团-17栋"},
+    {"iStationId": 157805, "vStationName": "17栋（10插座）2号机", "area": "四组团-17栋"},
+    {"iStationId": 157551, "vStationName": "17栋（10插座）3号机", "area": "四组团-17栋"},
     # {"iStationId": 117379, "vStationName": "第十餐厅1号机", "area": "三组团"},
     # {"iStationId": 117392, "vStationName": "第十餐厅2号机", "area": "三组团"},
     # {"iStationId": 117377, "vStationName": "游泳馆2号机", "area": "二组团"},
@@ -116,6 +127,7 @@ for station in stations:
         chargingStation = ChargingStation(station["vStationName"], outlet["vOutletName"], station["area"])
         if "设备维护中" in resp.text or outlet["status"] == 3:  # status=3 时页面提示该插座安全隐患不可用
             chargingStation.status = ChargingStation.Status.UNAVAILABLE
+            continue
         elif (soup := BeautifulSoup(resp.text, "lxml")).select_one(".state_item"):
             chargingStation.status = ChargingStation.Status.USING
             chargingStation.power = extractDigit(soup.select_one(".state_item:nth-child(1) p").text)  # 瓦
