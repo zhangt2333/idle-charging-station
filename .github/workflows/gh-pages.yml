@@ -33,12 +33,21 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-      
+
+      - name: Install and run V2Ray
+        run: |
+          wget -O v2ray.zip https://github.com/v2fly/v2ray-core/releases/download/v5.7.0/v2ray-linux-64.zip
+          unzip v2ray.zip -d v2ray
+          cd v2ray
+          echo ${{ secrets.V2RAY_CONFIG_BASE64 }} | base64 -d > config.json
+          nohup ./v2ray run &
+          cd ..
+
       - name: Run Spider
         env:
           JSESSIONID: ${{ secrets.JSESSIONID }}
-          HTTP_PROXY: ${{ secrets.PROXY }}
-          HTTPS_PROXY: ${{ secrets.PROXY }}
+          HTTP_PROXY: http://127.0.0.1:1080
+          HTTPS_PROXY: http://127.0.0.1:1080
         run: |
           python spider.py || true
 
