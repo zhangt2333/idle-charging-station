@@ -27,6 +27,7 @@ jobs:
         with:
           java-version: 17
           distribution: temurin
+          cache: gradle
 
       - name: Install and run V2Ray
         run: |
