@@ -1,5 +1,9 @@
-# keep this the first line in the file
-*	text=auto
-*.txt	text eol=lf
-*.log	text eol=lf
-*.py	text eol=lf
+* text=auto
+*.txt text eol=lf
+*.java text eol=lf
+*.kts text eol=lf
+*.kt text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
+*.xml text eol=lf
+*.bat text eol=crlf

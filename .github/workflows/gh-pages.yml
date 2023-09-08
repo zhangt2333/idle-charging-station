@@ -21,18 +21,12 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - uses: actions/setup-java@v3
         with:
-          python-version: "3.11"
-          cache: "pip"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          java-version: 17
+          distribution: temurin
 
       - name: Install and run V2Ray
         run: |
@@ -44,12 +38,14 @@ jobs:
           cd ..
 
       - name: Run Spider
+        uses: gradle/gradle-build-action@v2
         env:
           JSESSIONID: ${{ secrets.JSESSIONID }}
           HTTP_PROXY: http://127.0.0.1:1080
           HTTPS_PROXY: http://127.0.0.1:1080
-        run: |
-          python spider.py || true
+        with:
+          arguments: |
+            run
 
       - name: Setup Pages
         uses: actions/configure-pages@v2
@@ -57,7 +53,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
-          path: "./build"
+          path: "./build/html"
 
       - name: Deploy to GitHub Pages
         id: deployment
