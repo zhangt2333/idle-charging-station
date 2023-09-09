@@ -3,8 +3,8 @@ package util
 import com.fasterxml.jackson.databind.JsonNode
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.internal.closeQuietly
 import java.io.IOException
-import java.net.SocketTimeoutException
 
 fun OkHttpClient.syncGetHtml(url: String): String {
     val request = Request.Builder()
@@ -13,12 +13,13 @@ fun OkHttpClient.syncGetHtml(url: String): String {
     val maxTries = 3
     for (i in 1..maxTries) {
         try {
-            this.newCall(request).execute().use {
-                if (!it.isSuccessful) {
-                    throw IOException("Unexpected code $it")
-                }
-                return@syncGetHtml it.body!!.string()
+            val resp = this.newCall(request).execute()
+            if (!resp.isSuccessful) {
+                throw IOException("Unexpected code $resp")
             }
+            val result = resp.body!!.string()
+            resp.closeQuietly()
+            return result
         } catch (e: Exception) {
             if (i == maxTries) {
                 throw e
@@ -35,12 +36,13 @@ fun OkHttpClient.syncGetJson(url: String): JsonNode {
     val maxTries = 3
     for (i in 1..maxTries) {
         try {
-            this.newCall(request).execute().use {
-                if (!it.isSuccessful) {
-                    throw IOException("Unexpected code $it")
-                }
-                return@syncGetJson JsonUtils.toJson(it.body!!.string())!!
+            val resp = this.newCall(request).execute()
+            if (!resp.isSuccessful) {
+                throw IOException("Unexpected code $resp")
             }
+            val result = JsonUtils.toJson(resp.body!!.string())!!
+            resp.closeQuietly()
+            return result
         } catch (e: Exception) {
             if (i == maxTries) {
                 throw e
