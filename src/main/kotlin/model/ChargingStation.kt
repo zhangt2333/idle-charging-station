@@ -13,9 +13,7 @@ data class ChargingStation(
 ) {
 
     val remainingMinutes: Int
-        get() = if (status !== Status.UNAVAILABLE) {
-            totalMinutes - usedMinutes
-        } else 999
+        get() = totalMinutes - usedMinutes
 
     val usedAndTotalMinutesDesc: String
         get() = if (status === Status.USING) {
@@ -37,41 +35,23 @@ data class ChargingStation(
             status.msg
         } else ""
 
-    data class Builder(
-        var stationName: String? = null,
-        var outletName: String? = null,
-        var area: String? = null,
-        var status: Status = Status.AVAILABLE,
-        var power: Int = 0,
-        var usedMinutes: Int = 0,
-        var totalMinutes: Int = 0,
-    ) {
+    enum class Status(val code: Int, val msg: String, val totalMinutes: Int) {
 
-        fun stationName(stationName: String) = apply { this.stationName = stationName }
-        fun outletName(outletName: String) = apply { this.outletName = outletName }
-        fun area(area: String) = apply { this.area = area }
-        fun status(status: Status) = apply { this.status = status }
-        fun power(power: Int) = apply { this.power = power }
-        fun usedMinutes(usedMinutes: Int) = apply { this.usedMinutes = usedMinutes }
-        fun totalMinutes(totalMinutes: Int) = apply { this.totalMinutes = totalMinutes }
+        AVAILABLE(1, "空闲中", 0),
+        USING(2, "使用中", 999),
+        UNAVAILABLE(3, "维护中", 1000),
 
-        fun build(): ChargingStation {
-            return ChargingStation(
-                stationName = stationName!!,
-                outletName = outletName!!,
-                area = area!!,
-                status = status,
-                power = power,
-                usedMinutes = usedMinutes,
-                totalMinutes = totalMinutes,
-            )
-        }
-    }
-
-    enum class Status(val msg: String) {
-        USING("使用中"),
-        AVAILABLE("空闲中"),
-        UNAVAILABLE("维护中"),
         ;
+
+        companion object {
+            fun of(code: Int): Status {
+                for (status in entries) {
+                    if (status.code == code) {
+                        return status
+                    }
+                }
+                throw IllegalArgumentException("unknown code $code")
+            }
+        }
     }
 }

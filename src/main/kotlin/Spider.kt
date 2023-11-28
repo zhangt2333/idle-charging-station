@@ -20,23 +20,17 @@ import model.Station
 import util.OkHttpUtils
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.Response
-import org.jsoup.Jsoup
 import util.TimeUtils
-import util.syncGetHtml
 import util.syncGetJson
 import java.io.File
-import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Proxy
-import java.net.SocketTimeoutException
 import java.net.URI
 import java.util.concurrent.CopyOnWriteArrayList
 
 class Spider {
 
-    private val JSESSIONID = System.getenv("JSESSIONID") ?: ""
+    private val token = System.getenv("token") ?: ""
 
     private val proxy = System.getenv("HTTP_PROXY")
         ?.let { URI(it) }
@@ -51,7 +45,7 @@ class Spider {
                 "User-Agent",
                 "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36 NetType/WIFI MicroMessenger/7.0.20.1781(0x6700143B) WindowsWechat(0x6307061d)",
             )
-            .addHeader("Cookie", "JSESSIONID=$JSESSIONID")
+            .addHeader("token", token)
             .build()
 
         chain.proceed(modifiedRequest)
@@ -63,52 +57,54 @@ class Spider {
         .build()
 
     fun checkAlive(): Boolean {
-        val html = client.syncGetHtml(
-            "https://api.issks.com//issksapi/V2/ec/userInfo.shtml"
+        val json = client.syncGetJson(
+            "https://wemp.issks.com/recharge/v1/registerCard/checkSign"
         )
-        return "请在微信客户端打开链接" !in html
+        return json.get("success").asBoolean()
     }
 
     fun fetchOutletList(station: Station): List<Outlet> {
         val json = client.syncGetJson(
-            "https://api.issks.com/issksapi/V2/ec/chargingList.shtml?stationId=${station.id}"
+            "https://wemp.issks.com/charge/v1/outlet/station/outlets/${station.id}"
         )
-        return (json.get("list") as ArrayNode).map {
+        return (json.get("data") as ArrayNode).map {
             Outlet(
-                it.get("vOutletNo").asText(),
-                it.get("vOutletName").asText(),
-                it.get("status").asInt(),
+                it.get("outletNo").asText(),
+                "插座" + it.get("outletSerialNo").asText(),
+                ChargingStation.Status.of(it.get("currentChargingRecordId").asInt()),
                 station,
             )
         }
     }
 
+    private fun String.extractDigit(): Int = try {
+        this.filter { it.isDigit() }.toInt()
+    } catch (ignored: Exception) {
+        0
+    }
+
     fun fetchOutletDetail(outlet: Outlet): ChargingStation {
-        val html = client.syncGetHtml(
-            "https://api.issks.com/issksapi/V2/ec/charging/${outlet.no}.shtml"
+        val json = client.syncGetJson(
+            "https://wemp.issks.com/charge/v1/charging/outlet/${outlet.no}"
         )
-        val builder = ChargingStation.Builder()
-            .stationName(outlet.station.name)
-            .outletName(outlet.name)
-            .area(outlet.station.area)
-        if ("设备维护中" in html || outlet.status == 3) { // status=3 时页面提示该插座安全隐患不可用
-            builder.status(ChargingStation.Status.UNAVAILABLE)
-        } else {
-            fun String.extractDigit(): Int = try {
-                this.filter { it.isDigit() }.toInt()
-            } catch (ignored: Exception) {
-                0
-            }
-            Jsoup.parse(html).selectFirst(".charging_state")?.let {
-                builder.status(ChargingStation.Status.USING)
-                builder.power(it.selectFirst(".state_item:nth-child(1) p")!!.text().extractDigit())
-                builder.usedMinutes(it.selectFirst(".state_item:nth-child(2) p")!!.text().extractDigit())
-                val totalMinutes = 60 * it.select(".state_item:nth-child(1) span").last()!!
-                    .text().extractDigit()
-                builder.totalMinutes(if (totalMinutes != 0) totalMinutes else 600)
-            }
+        val usedMin = json.get("data").get("usedmin").asInt()
+        val remainingMin = json.get("data").get("restmin").asInt()
+        val totalMin = when (outlet.status) {
+            ChargingStation.Status.AVAILABLE -> 0
+            ChargingStation.Status.USING -> if (remainingMin > 0) usedMin + remainingMin else 999
+            ChargingStation.Status.UNAVAILABLE -> 1000
         }
-        return builder.build()
+
+        val power = json.get("powerFee")?.get("billingPower")?.asText()?.extractDigit() ?: 0
+        return ChargingStation(
+            stationName = outlet.station.name,
+            outletName = outlet.name,
+            area = outlet.station.area,
+            status = outlet.status,
+            power = power,
+            usedMinutes = usedMin,
+            totalMinutes = totalMin,
+        )
     }
 
 }
