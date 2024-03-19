@@ -1,4 +1,0 @@
-aiohttp
-beautifulsoup4
-lxml
-tabulate
