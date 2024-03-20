@@ -5,7 +5,9 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.html.body
 import kotlinx.html.h1
 import kotlinx.html.h3
+import kotlinx.html.head
 import kotlinx.html.html
+import kotlinx.html.p
 import kotlinx.html.stream.createHTML
 import kotlinx.html.style
 import kotlinx.html.table
@@ -13,6 +15,7 @@ import kotlinx.html.tbody
 import kotlinx.html.td
 import kotlinx.html.th
 import kotlinx.html.thead
+import kotlinx.html.title
 import kotlinx.html.tr
 import model.ChargingStation
 import model.Outlet
@@ -20,6 +23,7 @@ import model.Station
 import util.OkHttpUtils
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import util.JsonUtils
 import util.TimeUtils
 import util.syncGetJson
 import java.io.File
@@ -30,7 +34,9 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 class Spider {
 
-    private val token = System.getenv("token") ?: ""
+    private val token = System.getenv("token")
+        ?: File("token.json").readTextOrNull()?.trim()
+        ?: ""
 
     private val proxy = System.getenv("HTTP_PROXY")
         ?.let { URI(it) }
@@ -55,6 +61,14 @@ class Spider {
         .addInterceptor(headerInterceptor)
         .proxy(proxy)
         .build()
+
+    private fun File.readTextOrNull(charset: java.nio.charset.Charset = Charsets.UTF_8): String? {
+        return try {
+            this.readText(charset)
+        } catch (e: Exception) {
+            null
+        }
+    }
 
     fun checkAlive(): Boolean {
         val json = client.syncGetJson(
@@ -89,7 +103,12 @@ class Spider {
         )
         val usedMin = json.get("data").get("usedmin").asInt()
         val remainingMin = json.get("data").get("restmin").asInt()
-        val totalMin = when (outlet.status) {
+        val status = if (json.get("data").get("station").get("hardWareState").asInt() == 1) {
+            outlet.status
+        } else {
+            ChargingStation.Status.UNAVAILABLE
+        }
+        val totalMin = when (status) {
             ChargingStation.Status.AVAILABLE -> 0
             ChargingStation.Status.USING -> if (remainingMin > 0) usedMin + remainingMin else 999
             ChargingStation.Status.UNAVAILABLE -> 1000
@@ -100,7 +119,7 @@ class Spider {
             stationName = outlet.station.name,
             outletName = outlet.name,
             area = outlet.station.area,
-            status = outlet.status,
+            status = status,
             power = power,
             usedMinutes = usedMin,
             totalMinutes = totalMin,
@@ -110,14 +129,23 @@ class Spider {
 }
 
 fun main() {
-    val results: MutableList<ChargingStation> = CopyOnWriteArrayList()
+    val stations = JsonUtils.toJson(File("stations.json").readText())
+        ?.map {
+            Station(
+                it.get("id").asInt(),
+                it.get("name").asText(),
+                it.get("area").asText(),
+            )
+        }
+        ?: error("Read stations.json failed.")
 
+    val results: MutableList<ChargingStation> = CopyOnWriteArrayList()
     runBlocking {
         val spider = Spider()
         if (!spider.checkAlive()) {
             return@runBlocking
         }
-        for (station in Station.stations) {
+        for (station in stations) {
             launch(Dispatchers.IO) {
                 for (outlet in spider.fetchOutletList(station)) {
                     launch(Dispatchers.IO) {
@@ -132,12 +160,16 @@ fun main() {
     results.sortBy { it.remainingMinutes }
 
     val html = createHTML().html {
+        head {
+            title("南哪儿充不了电")
+        }
         body {
             style {
                 +"table, th, td { border: 1px solid; }"
             }
             h1 { +"更新时间：${TimeUtils.getDatetime()}" }
-            for (area in Station.stations.map { it.area }.distinct()) {
+            p { +"status:${if (results.isNotEmpty()) "up" else "down"}" }
+            for (area in stations.map { it.area }.distinct()) {
                 h3 { +area }
                 table {
                     thead {
@@ -164,6 +196,13 @@ fun main() {
                     }
                 }
             }
+        }
+    }
+
+    if (results.isNotEmpty()) {
+        File("build/data/${System.currentTimeMillis()}.data").let {
+            it.parentFile.mkdirs()
+            it.writeText(text = JsonUtils.toJsonString(results)!!)
         }
     }
 
