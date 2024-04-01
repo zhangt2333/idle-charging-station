@@ -71,10 +71,14 @@ class Spider {
     }
 
     fun checkAlive(): Boolean {
-        val json = client.syncGetJson(
-            "https://wemp.issks.com/recharge/v1/registerCard/checkSign"
-        )
-        return json.get("success").asBoolean()
+        return try {
+            val json = client.syncGetJson(
+                "https://wemp.issks.com/recharge/v1/registerCard/checkSign"
+            )
+            json.get("success").asBoolean()
+        } catch (e: Exception) {
+            false
+        }
     }
 
     fun fetchOutletList(station: Station): List<Outlet> {
