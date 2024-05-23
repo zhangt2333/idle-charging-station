@@ -1,5 +1,5 @@
 plugins {
-    kotlin("jvm") version "1.9.0"
+    kotlin("jvm") version "2.0.0"
     application
 }
 
@@ -12,15 +12,15 @@ repositories {
 
 dependencies {
     // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
     // Kotlin HTML
-    implementation("org.jetbrains.kotlinx:kotlinx-html-jvm:0.9.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-html-jvm:0.11.0")
     // OkHttp
-    implementation("com.squareup.okhttp3:okhttp:4.11.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
     // jsoup
-    implementation("org.jsoup:jsoup:1.16.1")
+    implementation("org.jsoup:jsoup:1.17.2")
     // Jackson
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.15.2")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.17.0")
 }
 
 kotlin {
