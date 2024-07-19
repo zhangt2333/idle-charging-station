@@ -17,13 +17,12 @@ import kotlinx.html.th
 import kotlinx.html.thead
 import kotlinx.html.title
 import kotlinx.html.tr
-import model.ChargingStation
 import model.Outlet
 import model.Station
-import util.OkHttpUtils
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import util.JsonUtils
+import util.OkHttpUtils
 import util.TimeUtils
 import util.syncGetJson
 import java.io.File
@@ -81,17 +80,12 @@ class Spider {
         }
     }
 
-    fun fetchOutletList(station: Station): List<Outlet> {
+    fun fetchOutletNo(station: Station): List<String> {
         val json = client.syncGetJson(
             "https://wemp.issks.com/charge/v1/outlet/station/outlets/${station.id}"
         )
         return (json.get("data") as ArrayNode).map {
-            Outlet(
-                it.get("outletNo").asText(),
-                "插座" + it.get("outletSerialNo").asText(),
-                ChargingStation.Status.of(it.get("currentChargingRecordId").asInt()),
-                station,
-            )
+            it.get("outletNo").asText()
         }
     }
 
@@ -101,28 +95,37 @@ class Spider {
         0
     }
 
-    fun fetchOutletDetail(outlet: Outlet): ChargingStation {
+    fun fetchOutletDetail(outletNo: String): Outlet {
         val json = client.syncGetJson(
-            "https://wemp.issks.com/charge/v1/charging/outlet/${outlet.no}"
+            "https://wemp.issks.com/charge/v1/charging/outlet/${outletNo}"
         )
-        val usedMin = json.get("data").get("usedmin").asInt()
-        val remainingMin = json.get("data").get("restmin").asInt()
-        val status = if (json.get("data").get("station").get("hardWareState").asInt() == 1) {
-            outlet.status
+        val data = json["data"]
+        val stationData = data["station"]
+        val outletData = data["outlet"]
+
+        val stationId = stationData["iStationId"].asInt()
+        val outletName = outletData["vOutletName"].asText()
+        val usedMin = data["usedmin"].asInt()
+        val remainingMin = data["restmin"].asInt()
+        val power = json["powerFee"]?.get("billingPower")?.asText()?.extractDigit() ?: 0
+        val status = if (data["station"]["hardWareState"].asInt() != 1) {
+            Outlet.Status.UNAVAILABLE
+        } else if (data["outlet"]["iCurrentChargingRecordId"].asInt() != 0) {
+            Outlet.Status.USING
+        } else if (data["outlet"]["iErrorCount"].asInt() > 0){
+            Outlet.Status.UNAVAILABLE
         } else {
-            ChargingStation.Status.UNAVAILABLE
+            Outlet.Status.AVAILABLE
         }
         val totalMin = when (status) {
-            ChargingStation.Status.AVAILABLE -> 0
-            ChargingStation.Status.USING -> if (remainingMin > 0) usedMin + remainingMin else 999
-            ChargingStation.Status.UNAVAILABLE -> 1000
+            Outlet.Status.AVAILABLE -> 0
+            Outlet.Status.USING -> if (remainingMin > 0) usedMin + remainingMin else 999
+            Outlet.Status.UNAVAILABLE -> 1000
         }
 
-        val power = json.get("powerFee")?.get("billingPower")?.asText()?.extractDigit() ?: 0
-        return ChargingStation(
-            stationName = outlet.station.name,
-            outletName = outlet.name,
-            area = outlet.station.area,
+        return Outlet(
+            outletName = outletName,
+            stationId = stationId,
             status = status,
             power = power,
             usedMinutes = usedMin,
@@ -133,6 +136,7 @@ class Spider {
 }
 
 fun main() {
+
     val stations = JsonUtils.toJson(File("stations.json").readText())
         ?.map {
             Station(
@@ -143,19 +147,39 @@ fun main() {
         }
         ?: error("Read stations.json failed.")
 
-    val results: MutableList<ChargingStation> = CopyOnWriteArrayList()
-    runBlocking {
-        val spider = Spider()
-        if (!spider.checkAlive()) {
-            return@runBlocking
+    val stationId2Station = stations.associateBy { it.id }
+
+    val stationId2OutletNos = mutableMapOf<String, List<String>>()
+    JsonUtils.toJson(File("outlets.json").readText())?.fields()?.forEach {
+        stationId2OutletNos[it.key] = it.value.map { it.asText() }
+    }
+
+    val spider = Spider()
+    if (spider.checkAlive()) {
+        runBlocking {
+            for (station in stations) {
+                launch(Dispatchers.IO) {
+                    val outletNo = spider.fetchOutletNo(station)
+                    stationId2OutletNos[station.id.toString()] = outletNo
+                }
+            }
         }
+        // write to disk
+        JsonUtils.toJsonString(stationId2OutletNos)?.let {
+            File("outlets.json").writeText(it)
+        }
+    }
+    if (stationId2OutletNos.isEmpty()) {
+        return
+    }
+
+    val results: MutableList<Outlet> = CopyOnWriteArrayList()
+    runBlocking{
         for (station in stations) {
-            launch(Dispatchers.IO) {
-                for (outlet in spider.fetchOutletList(station)) {
-                    launch(Dispatchers.IO) {
-                        val chargingStation = spider.fetchOutletDetail(outlet)
-                        results.add(chargingStation)
-                    }
+            stationId2OutletNos[station.id.toString()]?.forEach { outletNo ->
+                launch(Dispatchers.IO) {
+                    val chargingStation = spider.fetchOutletDetail(outletNo)
+                    results.add(chargingStation)
                 }
             }
         }
@@ -187,26 +211,22 @@ fun main() {
                         }
                     }
                     tbody {
-                        for (result in results.filter { it.area == area }) {
-                            tr {
-                                td { +result.stationName }
-                                td { +result.outletName }
-                                td { +result.usedAndTotalMinutesDesc }
-                                td { +result.remainingTimeDesc }
-                                td { +result.endTimeDesc }
-                                td { +result.note }
+                        for (result in results) {
+                            val station = stationId2Station[result.stationId]
+                            if (station?.area == area) {
+                                tr {
+                                    td { +station.name }
+                                    td { +result.outletName }
+                                    td { +result.usedAndTotalMinutesDesc }
+                                    td { +result.remainingTimeDesc }
+                                    td { +result.endTimeDesc }
+                                    td { +result.note }
+                                }
                             }
                         }
                     }
                 }
             }
-        }
-    }
-
-    if (results.isNotEmpty()) {
-        File("build/data/${System.currentTimeMillis()}.data").let {
-            it.parentFile.mkdirs()
-            it.writeText(text = JsonUtils.toJsonString(results)!!)
         }
     }
 
